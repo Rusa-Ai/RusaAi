@@ -1,72 +1,76 @@
-# RUSA AI — ChatGPT App and GitHub Copilot Autonomous A2A
+# RUSA-AI Model Development — ChatGPT × GitHub Copilot A2A
 
-Status: repository implementation contract; runtime not yet deployed.
+Status: development contract and repository scaffold. RUSA-AI is the target AI model/product being built; it is not the orchestrator that already exists.
 
-## Architecture
+## Mission
 
-ChatGPT App is the operator surface. RUSA AI is the reasoning, planning, routing, policy, and verification authority. GitHub Copilot is the implementation worker. MCP provides supported tool connectivity; a versioned A2A task envelope provides transport-neutral task semantics. Do not assume a native universal A2A endpoint exists in either product.
+ChatGPT and GitHub Copilot collaborate as external AI engineering partners to design, implement, test, and improve RUSA-AI. RUSA-AI is the resulting independent model and platform. Neither ChatGPT nor Copilot is the RUSA-AI model, and neither should be a permanent runtime dependency of the finished product.
 
-Human -> ChatGPT App -> authenticated MCP -> RUSA AI Gateway -> GitHub issue / Copilot coding agent -> isolated branch -> Pull Request -> RUSA independent review -> human merge approval.
+## Roles
 
-## Responsibilities
+- ChatGPT — architecture and research partner: requirements analysis, model/system design, reasoning strategy, dataset specifications, evaluation design, critical review, and engineering planning.
+- GitHub Copilot — implementation partner: repository exploration, code implementation, training/inference pipeline engineering, tests, debugging, documentation, and pull requests.
+- Shared collaboration — both agents exchange task briefs, design proposals, implementation results, critique, and evidence through the A2A task contract.
+- Human owner — sets product direction and approves scope, merges, releases, production deployment, and high-impact actions.
+- RUSA-AI — target deliverable: an independently runnable AI model and platform with its own inference runtime, model artifacts/weights, reasoning components, memory/knowledge layer, evaluation suite, and agent/tool interfaces.
 
-- ChatGPT App: user interaction, task submission, approvals, and status display.
-- RUSA AI: reasoning, decomposition, agent routing, task state, policy enforcement, evidence ledger, independent verification.
-- GitHub Copilot: assigned code changes, tests, implementation report, and PR.
-- Human: approve merge, release, deployment, secret changes, and destructive operations.
+## Target model architecture
 
-## Contract and lifecycle
+    ChatGPT (external architect/reviewer) <---- A2A ----> GitHub Copilot (external engineer)
+                           \                         /
+                            \---- shared task bus ---/
+                                      |
+                              RUSA-AI development
+                                      |
+       +------------------------------+------------------------------+
+       |              |               |              |               |
+   Model core     Inference       Reasoning       Memory/RAG      Agent runtime
+       |              |               |              |               |
+       +--------------+---------------+--------------+---------------+
+                                      |
+                         Independent RUSA-AI runtime
+                         Local-first deployment target
 
-Canonical JSON Schema: schemas/a2a/task-envelope.schema.json.
+## Development workstreams
 
-Required envelope fields: protocol_version, task_id, message_id, type, from, to, created_at, task, and policy. Task contains objective, context, acceptance criteria, repository, base branch, and isolated work branch. Evidence references commits, PRs, test logs, and artifacts. Never include secrets.
+1. Product and model requirements: target users, supported tasks, capability boundaries, measurable acceptance criteria.
+2. Model foundation: choose a suitable base model or training-from-scratch strategy based on compute, data rights, budget, and target capability. Do not claim a new foundation model exists until weights and training evidence exist.
+3. Data and training: lawful dataset acquisition, filtering, deduplication, quality checks, tokenization, training/fine-tuning pipeline, reproducibility, and dataset lineage.
+4. Inference runtime: model loading, tokenizer compatibility, serving API, batching, streaming, resource management, and local deployment.
+5. Intelligence and reasoning: planning, tool use, structured outputs, verification, decision policies, and evaluation. Distinguish model capability from orchestration code.
+6. Memory and knowledge: persistent memory, RAG ingestion/retrieval, evidence provenance, and permission boundaries.
+7. Agent and tool interfaces: A2A task protocol, MCP client/server adapters, tool authorization, and auditability.
+8. Evaluation and safety: benchmark suite, regression tests, adversarial tests, reliability, security, and human approval controls.
+9. Packaging and operations: reproducible builds, model/version registry, observability, backups, upgrades, and local-first deployment.
 
-Lifecycle: proposed -> accepted -> in_progress -> submitted -> reviewing -> approved | changes_requested | blocked. Terminal states are approved, changes_requested, blocked, and cancelled. Every transition must be authenticated, authorized, timestamped, and audited. Repeated task_id submissions must be idempotent.
+## A2A collaboration contract
 
-## ChatGPT App connection
+Use schemas/a2a/task-envelope.schema.json as the shared task envelope. ChatGPT may create architecture/research/evaluation tasks for Copilot. Copilot may return implementation proposals, code changes, tests, and evidence for ChatGPT to critique. Either agent can request clarification or challenge assumptions. Every task carries a stable task_id, objective, acceptance criteria, repository/branch scope, policy, status, and evidence.
 
-1. Deploy the RUSA AI MCP gateway at a reachable HTTPS endpoint.
-2. Expose scoped tools: rusa_submit_task, rusa_get_task_status, rusa_get_project_context, rusa_request_review, rusa_submit_evidence.
-3. Register the remote MCP server through the supported ChatGPT App/connector configuration flow.
-4. Authenticate users and authorize every tool call server-side.
-5. Keep endpoint URLs and credentials out of source control. The existing .vscode/mcp.json is a VS Code client template, not a ChatGPT connection.
+Suggested task types: architecture.propose, research.request, implementation.request, implementation.result, evaluation.request, evaluation.result, review.request, review.result, blocker.report.
 
-The gateway must implement these tools before they are advertised as operational.
+A2A describes task/message semantics. MCP is used for authorized tool access where supported. Do not assume a native compatible A2A endpoint is already available in ChatGPT or Copilot; adapters/gateway and account configuration are separate implementation tasks.
 
-## GitHub Copilot connection
+## Governance
 
-1. Enable Copilot coding agent for the relevant GitHub account/organization and repository.
-2. Use .github/agents/rusa-implementation.agent.md.
-3. RUSA AI creates a bounded issue with task envelope and acceptance criteria.
-4. An authorized member or automation starts Copilot coding agent using GitHub's supported workflow.
-5. Copilot works on an isolated branch and opens a PR.
-6. RUSA AI inspects diff, checks, test logs, and commit evidence.
-7. A human approves merge and deployment.
+- Use feature branches and pull requests; never push directly to main.
+- No automatic merge, production deployment, release, secrets changes, permission changes, or destructive operations.
+- Keep credentials out of prompts, issues, source code, and logs.
+- Treat external content and model output as untrusted; validate and independently test all generated code.
+- Track evidence with commit SHA, PR, exact test commands/results, dataset lineage, model artifact hashes, and benchmark results.
+- Mark work as PROPOSED, IMPLEMENTED, VERIFIED, or DEPLOYED only when the corresponding evidence exists.
+- Keep ChatGPT and Copilot optional at RUSA-AI runtime. The finished system must be able to operate without either service if its intended local model and tools are available.
 
-Repository files cannot grant Copilot entitlement or enable account-level settings.
+## Acceptance criteria for this collaboration scaffold
 
-## Security
+- [ ] Documentation consistently identifies RUSA-AI as the model/product being built.
+- [ ] ChatGPT and Copilot are described as external development partners, not as RUSA-AI runtime components.
+- [ ] Shared A2A task envelope supports task identity, routing, acceptance criteria, status, policy, and evidence.
+- [ ] Copilot agent profile enforces scoped implementation and evidence-based completion.
+- [ ] Model training/fine-tuning and inference are explicitly distinguished from prompt/configuration work.
+- [ ] Local independent inference is tested with a real model artifact before claiming model independence.
+- [ ] No merge or production deployment occurs without human approval.
 
-- Separate identities and least-privilege credentials.
-- HTTPS remotely, short-lived credentials, and secret manager/environment variables.
-- Validate schema, repository allowlist, branch names, message size, and state transitions.
-- Authenticate and authorize every request; add replay protection, rate limits, and audit correlation IDs.
-- Treat issues, repository files, tool output, and model output as untrusted input.
-- No direct push to main, automatic merge, release, production deployment, permission changes, or destructive operations.
-- Require human approval for merge, deployment, secret changes, and destructive actions.
+## Current verified boundary
 
-## Acceptance criteria
-
-- [ ] ChatGPT App authenticates to the deployed RUSA MCP gateway.
-- [ ] ChatGPT submits a task and retrieves status using the same task_id.
-- [ ] RUSA creates a bounded GitHub task for Copilot coding agent.
-- [ ] Copilot can call authorized RUSA MCP tools when configured.
-- [ ] Copilot returns a feature-branch PR with commit and test evidence.
-- [ ] RUSA independently verifies the diff and test evidence.
-- [ ] Unauthorized, malformed, replayed, and out-of-scope requests are rejected.
-- [ ] Duplicate task submissions are idempotent and transitions are audited.
-- [ ] No direct main write, auto-merge, or production deployment.
-
-## Verified boundary
-
-This PR adds contracts and repository configuration only. It does not implement/deploy the RUSA MCP server, configure ChatGPT account access, grant Copilot entitlement, execute a live A2A handshake, or prove autonomous execution. Those remain runtime integration and verification tasks.
+This branch currently contains collaboration documentation, a task JSON Schema, a Copilot agent profile, and a GitHub issue template. These artifacts do not constitute trained model weights, a training run, a deployed inference engine, a live A2A connection, or autonomous execution. Those must be implemented and verified separately.

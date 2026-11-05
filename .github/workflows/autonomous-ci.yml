@@ -26,8 +26,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Check whitespace errors
-        run: git diff --check
+      - name: Check committed diff whitespace
+        run: |
+          if git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            git diff --check HEAD^ HEAD
+          else
+            git diff --check
+          fi
       - name: Validate JSON files and conflict markers
         shell: bash
         run: |
@@ -36,24 +41,23 @@ jobs:
           from pathlib import Path
           import sys
 
-          ignored = {".git", ".venv", "node_modules", "__pycache__"}
+          ignored = {".git", ".venv", "venv", "node_modules", "__pycache__"}
           errors = []
           for path in Path(".").rglob("*"):
               if not path.is_file() or any(part in ignored for part in path.parts):
                   continue
               try:
-                  text = path.read_text(encoding="utf-8")
+                  content = path.read_text(encoding="utf-8")
               except (UnicodeDecodeError, OSError):
                   continue
               if path.suffix.lower() == ".json":
                   try:
-                      json.loads(text)
+                      json.loads(content)
                   except json.JSONDecodeError as exc:
                       errors.append(f"{path}: invalid JSON: {exc}")
-              for marker in ("<<<<<<< ", "=======", ">>>>>>> "):
-                  if marker in text:
-                      errors.append(f"{path}: possible merge-conflict marker {marker!r}")
-                      break
+              markers = ("<" * 7, "=" * 7, ">" * 7)
+              if any(line.lstrip().startswith(markers) for line in content.splitlines()):
+                  errors.append(f"{path}: possible merge-conflict marker")
           if errors:
               print("\n".join(errors))
               sys.exit(1)

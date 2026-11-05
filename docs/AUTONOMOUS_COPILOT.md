@@ -34,3 +34,17 @@ This is a baseline, not a complete test strategy. It does not install arbitrary 
 - Review Actions permissions and branch protection/rulesets in GitHub settings.
 - Do not grant write permissions to CI unless a reviewed workflow specifically requires them.
 - Verify each custom agent appears in the Copilot agent picker in the supported IDE or GitHub interface.
+
+
+## Important activation boundary
+Repository custom agent profiles can be tested from this branch in a supported IDE when the branch is checked out. For Copilot cloud agent on GitHub.com, GitHub's documented setup requires the profile files to be merged into the repository's default branch before they appear in the cloud agent picker. This PR intentionally remains unmerged to preserve the owner's no-main-change boundary.
+
+The CI workflow is committed on this feature branch. A workflow run has not yet been verified through the available GitHub connection. GitHub Actions may need to be enabled in repository settings, and a manual `workflow_dispatch` run can be started from the Actions tab after GitHub recognizes the workflow. Do not mark CI as VERIFIED until the run and job logs show success.
+
+## Safe manual smoke test
+After the PR is reviewed and merged by the owner (or while using the feature branch in a supported IDE):
+1. Open the repository and select the `rusa-autonomous-engineer` custom agent.
+2. Ask it to inspect the repository and propose a small documentation-only change.
+3. Require a dedicated branch and PR; do not permit direct commits to `main`.
+4. Confirm it reads repository instructions, runs available checks, and reports exact evidence.
+5. Confirm no merge or deployment occurs without human approval.

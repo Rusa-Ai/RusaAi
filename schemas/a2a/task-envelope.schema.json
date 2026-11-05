@@ -197,7 +197,7 @@
           "enum": [
             "human",
             "chatgpt_app",
-            "rusa_orchestrator",
+            "a2a_gateway",
             "github_copilot"
           ]
         }

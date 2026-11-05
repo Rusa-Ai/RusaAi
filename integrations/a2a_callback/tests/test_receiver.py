@@ -40,11 +40,13 @@ class CallbackTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "recipient role"):
             validate_callback(payload)
 
-    def test_rejects_unknown_event(self):
-        payload = sample()
-        payload["type"] = "task.delete"
-        with self.assertRaisesRegex(ValueError, "unsupported callback type"):
-            validate_callback(payload)
+    def test_rejects_unknown_or_non_string_event(self):
+        for event_type in ("task.delete", [], {}):
+            with self.subTest(event_type=event_type):
+                payload = sample()
+                payload["type"] = event_type
+                with self.assertRaisesRegex(ValueError, "unsupported callback type"):
+                    validate_callback(payload)
 
     def test_rejects_invalid_task_id(self):
         payload = sample()
@@ -61,6 +63,7 @@ class CallbackTests(unittest.TestCase):
         self.assertTrue(verify_signature(timestamp, body, signature, secret, now=1793923200))
         self.assertFalse(verify_signature(timestamp, body + b" ", signature, secret, now=1793923200))
         self.assertFalse(verify_signature(timestamp, body, signature, secret, now=1793923601))
+        self.assertFalse(verify_signature("not-a-time", body, signature, secret, now=1793923200))
 
     def test_store_is_idempotent_and_queryable(self):
         with tempfile.TemporaryDirectory() as directory:

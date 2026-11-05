@@ -4,21 +4,21 @@ import json
 import tempfile
 import unittest
 import sys
-import json
 import threading
+import urllib.error
 import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from receiver import CallbackStore, make_handler, validate_callback, verify_signature
+from receiver import CallbackStore, IdempotencyConflict, make_handler, validate_callback, verify_signature
 from sender import send_callback
 
 
-def sample():
+def sample(message_id="msg-001"):
     return {
         "protocol_version": "1.0",
-        "message_id": "msg-001",
+        "message_id": message_id,
         "task_id": "task-001",
         "type": "task.completed",
         "from": {"agent_id": "copilot", "role": "github_copilot"},
@@ -53,11 +53,14 @@ class CallbackTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "unsupported callback type"):
                     validate_callback(payload)
 
-    def test_rejects_invalid_task_id(self):
-        payload = sample()
-        payload["task_id"] = "../other"
-        with self.assertRaisesRegex(ValueError, "invalid characters"):
-            validate_callback(payload)
+    def test_rejects_invalid_identifiers_and_timestamp(self):
+        for field, value in (("task_id", "../other"), ("message_id", "message id"),
+                             ("created_at", "tomorrow"), ("created_at", "2026-11-06T00:00:00")):
+            with self.subTest(field=field, value=value):
+                payload = sample()
+                payload[field] = value
+                with self.assertRaises(ValueError):
+                    validate_callback(payload)
 
     def test_signature_valid_and_tamper_proof(self):
         secret = "x" * 40
@@ -70,15 +73,34 @@ class CallbackTests(unittest.TestCase):
         self.assertFalse(verify_signature(timestamp, body, signature, secret, now=1793923601))
         self.assertFalse(verify_signature("not-a-time", body, signature, secret, now=1793923200))
 
-    def test_store_is_idempotent_and_queryable(self):
+    def test_store_idempotency_and_conflict(self):
         with tempfile.TemporaryDirectory() as directory:
             store = CallbackStore(str(Path(directory) / "callbacks.sqlite3"))
             payload = sample()
             self.assertTrue(store.insert(payload))
             self.assertFalse(store.insert(payload))
-            records = store.list_for_task("task-001")
+            conflicting_payload = sample()
+            conflicting_payload["result"] = {"summary": "different content"}
+            with self.assertRaises(IdempotencyConflict):
+                store.insert(conflicting_payload)
+            records, next_cursor = store.page_for_task("task-001")
             self.assertEqual(len(records), 1)
+            self.assertIsNone(next_cursor)
             self.assertEqual(records[0]["payload"]["message_id"], "msg-001")
+
+    def test_store_pages_are_bounded_and_complete(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = CallbackStore(str(Path(directory) / "callbacks.sqlite3"))
+            for index in range(3):
+                store.insert(sample(f"msg-{index:03}"))
+            first, cursor = store.page_for_task("task-001", limit=2)
+            self.assertEqual(len(first), 2)
+            self.assertIsNotNone(cursor)
+            second, next_cursor = store.page_for_task("task-001", limit=2, cursor=cursor)
+            self.assertEqual(len(second), 1)
+            self.assertIsNone(next_cursor)
+            self.assertEqual({item["payload"]["message_id"] for item in first + second},
+                             {"msg-000", "msg-001", "msg-002"})
 
 
 class CallbackHttpTests(unittest.TestCase):
@@ -118,6 +140,22 @@ class CallbackHttpTests(unittest.TestCase):
             result = json.loads(response.read())
         self.assertEqual(result["task_id"], "task-001")
         self.assertEqual(len(result["callbacks"]), 1)
+        self.assertIsNone(result["next_cursor"])
+
+    def test_poll_requires_authentication_and_supports_query(self):
+        request = urllib.request.Request(self.endpoint + "/v1/tasks/task-001/callbacks?limit=1")
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(request, timeout=5)
+        self.assertEqual(error.exception.code, 401)
+
+    def test_rejects_non_json_post(self):
+        request = urllib.request.Request(
+            self.endpoint + "/v1/callbacks", data=b"{}", headers={"Content-Type": "text/plain"}, method="POST"
+        )
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(request, timeout=5)
+        self.assertEqual(error.exception.code, 415)
+
 
 if __name__ == "__main__":
     unittest.main()

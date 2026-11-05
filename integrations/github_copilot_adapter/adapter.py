@@ -50,7 +50,7 @@ Copilot must provide changed files, exact test commands/results, commit SHA, PR 
     return title,body
 
 def submit(repo,title,body,token,dry_run=False):
-    payload={"title":title,"body":body,"labels":["a2a-handoff"]}
+    payload={"title":title,"body":body}
     if dry_run: return {"dry_run":True,"payload":payload}
     req=urllib.request.Request(f"https://api.github.com/repos/{repo}/issues",data=json.dumps(payload).encode(),headers={
         "Accept":"application/vnd.github+json","Authorization":f"Bearer {token}",

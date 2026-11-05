@@ -1,0 +1,35 @@
+name: rusaai-worker-manual
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Bootstrap mode (only dry-run is enabled)"
+        required: true
+        type: choice
+        options:
+          - dry-run
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rusaai-worker-manual
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate worker configuration
+        env:
+          RUSAAI_MODEL_PROVIDER: flexible
+          RUSAAI_ENVIRONMENT: development
+        run: python -m rusa_worker --dry-run

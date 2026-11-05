@@ -10,6 +10,8 @@ This is a local, authenticated callback receiver for task lifecycle events sent 
 - Strict callback envelope validation and a 1 MiB body limit.
 - SQLite persistence with `message_id` as a unique key (idempotent duplicate handling).
 - Authenticated `GET /v1/tasks/{task_id}/callbacks` polling endpoint.
+- Dependency-free `sender.py` client that signs and posts callback envelopes.
+- Local end-to-end test covering sender → authenticated receiver → SQLite → authenticated polling.
 - Loopback-only bind address by default.
 - Unit tests for envelope validation, signature verification, tamper detection, timestamp expiry, and persistence/idempotency.
 
@@ -47,6 +49,17 @@ The sender must:
 Allowed event types: `task.accepted`, `task.progress`, `task.completed`, `task.failed`.
 
 The reader polls `/v1/tasks/{task_id}/callbacks` with `Authorization: Bearer <RUSA_CALLBACK_READ_TOKEN>`.
+
+## Send a callback
+
+Save a callback envelope as `callback.json`, then run:
+
+```bash
+export RUSA_CALLBACK_HMAC_SECRET="..."
+python integrations/a2a_callback/sender.py --endpoint http://127.0.0.1:8765 --input callback.json
+```
+
+The sender and receiver must use the same HMAC secret. The callback reader uses the separate read token.
 
 Required envelope fields: `protocol_version` (`1.0`), `message_id`, `task_id`, `type`, `from`, `to`, and `created_at`. Sender role must be `github_copilot`; recipient role must be `a2a_gateway`.
 

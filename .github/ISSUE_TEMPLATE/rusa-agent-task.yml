@@ -1,0 +1,57 @@
+name: RUSA AI Agent Task
+description: Submit a bounded engineering task for RUSA AI planning and GitHub Copilot implementation.
+title: "[RUSA-TASK] "
+labels: ["rusa-ai-task"]
+body:
+  - type: input
+    id: task_id
+    attributes:
+      label: Task ID
+      description: Use a unique UUID so status updates and retries can be correlated.
+      placeholder: "00000000-0000-4000-8000-000000000000"
+    validations:
+      required: true
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: One clear engineering outcome.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List observable, testable completion conditions.
+      placeholder: "- [ ] ..."
+    validations:
+      required: true
+  - type: input
+    id: base_branch
+    attributes:
+      label: Base branch
+      value: main
+    validations:
+      required: true
+  - type: input
+    id: work_branch
+    attributes:
+      label: Work branch
+      description: Use feature/, fix/, chore/, or docs/ prefix.
+      placeholder: "feature/task-name"
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints and prohibited actions
+      value: "No direct push to main. No merge, release, secret changes, destructive operations, or production deployment. Human approval required."
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Required evidence
+      description: Specify tests, logs, commit and PR evidence required for independent review.
+    validations:
+      required: true

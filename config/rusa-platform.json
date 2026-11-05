@@ -1,0 +1,33 @@
+{
+  "contract_version": "1.0.0",
+  "product": "RUSA-AI",
+  "deployment": {
+    "mode": "local",
+    "external_model_apis_enabled_by_default": false,
+    "core_runtime_requires_internet": false
+  },
+  "autonomy": {
+    "mode": "full",
+    "approval_policy": "controlled",
+    "may_create_feature_branches": true,
+    "may_open_draft_pull_requests": true,
+    "may_merge_default_branch_without_approval": false,
+    "may_deploy_without_approval": false,
+    "may_perform_destructive_operations_without_approval": false
+  },
+  "evidence_statuses": [
+    "PLANNED",
+    "IMPLEMENTED",
+    "VERIFIED",
+    "DEPLOYED"
+  ],
+  "runtime_components": {
+    "local_model_inference": "PLANNED",
+    "persistent_orchestrator": "PLANNED",
+    "durable_task_queue": "PLANNED",
+    "agent_workers": "PLANNED",
+    "independent_verifier": "PLANNED",
+    "model_training_pipeline": "PLANNED",
+    "local_observability": "PLANNED"
+  }
+}

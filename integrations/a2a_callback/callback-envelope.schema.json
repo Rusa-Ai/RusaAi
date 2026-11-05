@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RUSA-AI A2A Callback Envelope",
+  "type": "object",
+  "required": [
+    "protocol_version",
+    "message_id",
+    "task_id",
+    "type",
+    "from",
+    "to",
+    "created_at"
+  ],
+  "properties": {
+    "protocol_version": {
+      "const": "1.0"
+    },
+    "message_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "type": {
+      "enum": [
+        "task.accepted",
+        "task.progress",
+        "task.completed",
+        "task.failed"
+      ]
+    },
+    "from": {
+      "$ref": "#/$defs/agent"
+    },
+    "to": {
+      "$ref": "#/$defs/agent"
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "result": {
+      "type": "object"
+    },
+    "evidence": {
+      "type": "array"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "agent": {
+      "type": "object",
+      "required": [
+        "agent_id",
+        "role"
+      ],
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

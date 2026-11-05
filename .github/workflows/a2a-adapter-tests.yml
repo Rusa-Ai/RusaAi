@@ -1,0 +1,27 @@
+name: A2A Copilot Adapter Checks
+
+on:
+  pull_request:
+    paths:
+      - "integrations/github_copilot_adapter/**"
+      - "schemas/a2a/task-envelope.schema.json"
+      - ".github/workflows/a2a-adapter-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  adapter-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate task schema JSON syntax
+        run: python -m json.tool schemas/a2a/task-envelope.schema.json > /dev/null
+      - name: Run adapter unit tests
+        run: python -m unittest discover -s integrations/github_copilot_adapter/tests -v

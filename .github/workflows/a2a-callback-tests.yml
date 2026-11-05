@@ -1,0 +1,26 @@
+name: A2A Callback Inbox Checks
+
+on:
+  pull_request:
+    paths:
+      - "integrations/a2a_callback/**"
+      - ".github/workflows/a2a-callback-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  callback-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run callback inbox unit tests
+        run: python -m unittest discover -s integrations/a2a_callback/tests -v
+      - name: Compile callback inbox
+        run: python -m compileall -q integrations/a2a_callback

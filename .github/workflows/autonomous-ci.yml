@@ -1,0 +1,99 @@
+name: RUSA-AI Autonomous Coding CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - main
+      - "feat/**"
+      - "fix/**"
+      - "chore/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rusa-ai-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository-integrity:
+    name: Repository integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Check whitespace errors
+        run: git diff --check
+      - name: Validate JSON files and conflict markers
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+
+          ignored = {".git", ".venv", "node_modules", "__pycache__"}
+          errors = []
+          for path in Path(".").rglob("*"):
+              if not path.is_file() or any(part in ignored for part in path.parts):
+                  continue
+              try:
+                  text = path.read_text(encoding="utf-8")
+              except (UnicodeDecodeError, OSError):
+                  continue
+              if path.suffix.lower() == ".json":
+                  try:
+                      json.loads(text)
+                  except json.JSONDecodeError as exc:
+                      errors.append(f"{path}: invalid JSON: {exc}")
+              for marker in ("<<<<<<< ", "=======", ">>>>>>> "):
+                  if marker in text:
+                      errors.append(f"{path}: possible merge-conflict marker {marker!r}")
+                      break
+          if errors:
+              print("\n".join(errors))
+              sys.exit(1)
+          print("Repository integrity checks passed.")
+          PY
+
+  python-validation:
+    name: Python validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: ${{ hashFiles('**/*.py') != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile Python sources
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import compileall
+          ignored = {".git", ".venv", "venv", "node_modules", "__pycache__"}
+          files = [p for p in Path(".").rglob("*.py") if not any(x in ignored for x in p.parts)]
+          failed = [str(p) for p in files if not compileall.compile_file(str(p), quiet=1)]
+          if failed:
+              raise SystemExit("Python compilation failed: " + ", ".join(failed))
+          print(f"Compiled {len(files)} Python files.")
+          PY
+
+  node-validation:
+    name: Node validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ hashFiles('package-lock.json') != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Run project tests when defined
+        run: npm test --if-present

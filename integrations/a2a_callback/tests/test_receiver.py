@@ -4,10 +4,15 @@ import json
 import tempfile
 import unittest
 import sys
+import json
+import threading
+import urllib.request
+from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from receiver import CallbackStore, validate_callback, verify_signature
+from receiver import CallbackStore, make_handler, validate_callback, verify_signature
+from sender import send_callback
 
 
 def sample():
@@ -75,6 +80,44 @@ class CallbackTests(unittest.TestCase):
             self.assertEqual(len(records), 1)
             self.assertEqual(records[0]["payload"]["message_id"], "msg-001")
 
+
+class CallbackHttpTests(unittest.TestCase):
+    SECRET = "s" * 40
+    READ_TOKEN = "r" * 32
+
+    def setUp(self):
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.store = CallbackStore(str(Path(self.tempdir.name) / "http.sqlite3"))
+        self.server = ThreadingHTTPServer(
+            ("127.0.0.1", 0),
+            make_handler(self.store, self.SECRET, self.READ_TOKEN),
+        )
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+        self.endpoint = f"http://127.0.0.1:{self.server.server_address[1]}"
+
+    def tearDown(self):
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=2)
+        self.tempdir.cleanup()
+
+    def test_signed_sender_receiver_and_authenticated_poll(self):
+        payload = sample()
+        first = send_callback(self.endpoint, payload, self.SECRET)
+        second = send_callback(self.endpoint, payload, self.SECRET)
+        self.assertEqual(first["status"], "accepted")
+        self.assertFalse(first["duplicate"])
+        self.assertTrue(second["duplicate"])
+
+        request = urllib.request.Request(
+            self.endpoint + "/v1/tasks/task-001/callbacks",
+            headers={"Authorization": "Bearer " + self.READ_TOKEN},
+        )
+        with urllib.request.urlopen(request, timeout=5) as response:
+            result = json.loads(response.read())
+        self.assertEqual(result["task_id"], "task-001")
+        self.assertEqual(len(result["callbacks"]), 1)
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,40 @@
+name: RUSA-AI Platform Contract CI
+
+on:
+  pull_request:
+    paths:
+      - "config/rusa-platform.json"
+      - "docs/architecture/**"
+      - "docs/acceptance/**"
+      - "tests/test_platform_contract.py"
+      - ".github/workflows/rusa-platform-contracts.yml"
+  push:
+    branches:
+      - main
+      - "feat/full-autonomous-local-rusa-platform-v1"
+    paths:
+      - "config/rusa-platform.json"
+      - "docs/architecture/**"
+      - "docs/acceptance/**"
+      - "tests/test_platform_contract.py"
+      - ".github/workflows/rusa-platform-contracts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate JSON configuration
+        run: python -m json.tool config/rusa-platform.json > /dev/null
+      - name: Run platform contract tests
+        run: python -m unittest discover -s tests -p "test_*.py" -v

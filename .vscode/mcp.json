@@ -1,25 +1,14 @@
 {
   "servers": {
-    "rusa-ai": {
-      "type": "http",
-      "url": "${input:rusaMcpUrl}",
-      "headers": {
-        "Authorization": "Bearer ${input:rusaMcpToken}"
-      }
+    "rusaAiPrecision": {
+      "type": "stdio",
+      "command": "python",
+      "args": [
+        "-m",
+        "rusa_ai_precision.mcp_server"
+      ],
+      "cwd": "${workspaceFolder}/RUSA_AI_Precision_Engine_v1_1",
+      "envFile": "${workspaceFolder}/RUSA_AI_Precision_Engine_v1_1/.env"
     }
-  },
-  "inputs": [
-    {
-      "id": "rusaMcpUrl",
-      "type": "promptString",
-      "description": "RUSA AI MCP endpoint URL (use a trusted local HTTPS tunnel or localhost during development)",
-      "password": false
-    },
-    {
-      "id": "rusaMcpToken",
-      "type": "promptString",
-      "description": "Short-lived RUSA AI MCP access token",
-      "password": true
-    }
-  ]
+  }
 }

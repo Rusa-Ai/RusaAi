@@ -1,0 +1,25 @@
+{
+  "servers": {
+    "rusa-ai": {
+      "type": "http",
+      "url": "${input:rusaMcpUrl}",
+      "headers": {
+        "Authorization": "Bearer ${input:rusaMcpToken}"
+      }
+    }
+  },
+  "inputs": [
+    {
+      "id": "rusaMcpUrl",
+      "type": "promptString",
+      "description": "RUSA AI MCP endpoint URL (use a trusted local HTTPS tunnel or localhost during development)",
+      "password": false
+    },
+    {
+      "id": "rusaMcpToken",
+      "type": "promptString",
+      "description": "Short-lived RUSA AI MCP access token",
+      "password": true
+    }
+  ]
+}

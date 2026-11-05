@@ -24,6 +24,10 @@ TASK_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 def verify_signature(timestamp, raw_body, supplied_signature, secret, now=None, tolerance=300):
     if not timestamp or not supplied_signature or not secret:
         return False
+    if not isinstance(timestamp, str) or not re.fullmatch(r"[0-9]{1,12}", timestamp):
+        return False
+    if not isinstance(supplied_signature, str) or not re.fullmatch(r"[0-9a-f]{64}", supplied_signature):
+        return False
     try:
         stamp = int(timestamp)
     except (TypeError, ValueError):
@@ -51,7 +55,7 @@ def validate_callback(payload):
             raise ValueError(f"{key} must be a non-empty string")
     if not TASK_ID_PATTERN.fullmatch(payload["task_id"]):
         raise ValueError("task_id contains invalid characters")
-    if payload["type"] not in ALLOWED_EVENTS:
+    if not isinstance(payload["type"], str) or payload["type"] not in ALLOWED_EVENTS:
         raise ValueError("unsupported callback type")
     for key in ("from", "to"):
         agent = payload[key]

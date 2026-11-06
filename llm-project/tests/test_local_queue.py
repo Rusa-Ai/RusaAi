@@ -1,4 +1,5 @@
 import sqlite3
+import sqlite3
 import sys
 import tempfile
 import unittest
@@ -178,6 +179,51 @@ class SQLiteTaskQueueTests(unittest.TestCase):
             [event.event_type for event in self.queue.events("immutable-events")],
             ["TASK_ENQUEUED"],
         )
+
+    def test_complete_persists_json_result(self):
+        self.queue.enqueue("task", {}, task_id="result", now=10)
+        self.queue.claim("worker-a", now=11)
+        completed = self.queue.complete("result", "worker-a", result={"answer": 42}, now=12)
+        self.assertEqual(completed.result, {"answer": 42})
+        self.assertEqual(self.queue.get("result").result, {"answer": 42})
+
+    def test_queue_migrates_legacy_database_without_result_column(self):
+        legacy_path = Path(self.temp_dir.name) / "legacy.sqlite3"
+        connection = sqlite3.connect(legacy_path)
+        connection.execute(
+            """
+            CREATE TABLE tasks (
+                task_id TEXT PRIMARY KEY,
+                task_type TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                state TEXT NOT NULL,
+                priority INTEGER NOT NULL,
+                attempts INTEGER NOT NULL,
+                max_attempts INTEGER NOT NULL,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL,
+                available_at REAL NOT NULL,
+                claimed_by TEXT,
+                lease_expires_at REAL,
+                last_error TEXT
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO tasks VALUES
+            ('legacy', 'task', '{}', 'QUEUED', 0, 0, 3, 10, 10, 10, NULL, NULL, NULL)
+            """
+        )
+        connection.commit()
+        connection.close()
+
+        migrated = SQLiteTaskQueue(legacy_path)
+        self.assertIsNone(migrated.get("legacy").result)
+        columns = {
+            row["name"] for row in migrated._connect().execute("PRAGMA table_info(tasks)")
+        }
+        self.assertIn("result_json", columns)
 
     def test_file_database_survives_queue_reconstruction(self):
         self.queue.enqueue("task", {"value": 42}, task_id="persisted", now=10)

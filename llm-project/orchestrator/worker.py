@@ -24,7 +24,6 @@ for _path in (_HERE, _SERVE):
         sys.path.insert(0, str(_path))
 
 from local_queue import QueueConflict, SQLiteTaskQueue, Task
-from local_runtime import LocalOpenAICompatibleRuntime, RuntimeConfig
 
 
 TaskHandler = Callable[[dict[str, Any]], Any]
@@ -176,6 +175,8 @@ def build_worker_from_env() -> LocalWorker:
     queue_path = os.getenv("RUSA_QUEUE_DB", "./var/rusa-tasks.sqlite3")
     worker_id = os.getenv("RUSA_WORKER_ID", "rusa-local-worker-01")
     lease_seconds = float(os.getenv("RUSA_WORKER_LEASE_SECONDS", "180"))
+    from local_runtime import LocalOpenAICompatibleRuntime, RuntimeConfig
+
     queue = SQLiteTaskQueue(queue_path)
     runtime = LocalOpenAICompatibleRuntime(RuntimeConfig.from_env())
     return LocalWorker(

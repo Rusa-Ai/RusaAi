@@ -10,13 +10,12 @@ sys.path.insert(0, str(ROOT / "orchestrator"))
 sys.path.insert(0, str(ROOT / "serve"))
 
 from local_queue import SQLiteTaskQueue
-from local_runtime import RuntimeConfig
 from worker import LocalModelChatHandler, LocalWorker
 
 
 class FakeRuntime:
     def __init__(self, response="local answer"):
-        self.config = RuntimeConfig(model="rusa-test:latest")
+        self.config = type("RuntimeConfigStub", (), {"model": "rusa-test:latest"})()
         self.response = response
         self.calls = []
 

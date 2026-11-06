@@ -145,8 +145,12 @@ def validate_task_envelope(payload: Any) -> dict[str, Any]:
         or any(not isinstance(item, str) or not item.strip() for item in criteria)
     ):
         raise A2AValidationError("acceptance_criteria must be a non-empty string array")
-    if not _REPOSITORY_PATTERN.fullmatch(str(task["repository"])):
+    repository = task["repository"]
+    if not isinstance(repository, str) or not _REPOSITORY_PATTERN.fullmatch(repository):
         raise A2AValidationError("task.repository must use owner/repository form")
+    owner, repository_name = repository.split("/", 1)
+    if owner in {".", ".."} or repository_name in {".", ".."}:
+        raise A2AValidationError("task.repository contains an unsafe path segment")
     if not isinstance(task["base_branch"], str) or not task["base_branch"].strip():
         raise A2AValidationError("task.base_branch must be non-empty")
     work_branch = task["work_branch"]

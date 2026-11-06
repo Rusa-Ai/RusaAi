@@ -3,7 +3,7 @@ import sys
 import urllib.error
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "serve"))
 
@@ -129,9 +129,9 @@ class LocalRuntimeTests(unittest.TestCase):
                     )
 
     def test_bad_json_is_reported(self):
-        response = Mock()
-        response.__enter__ = Mock(return_value=Mock(read=Mock(return_value=b"{")))
-        response.__exit__ = Mock(return_value=False)
+        response = MagicMock()
+        response.__enter__.return_value = Mock(read=Mock(return_value=b"{"))
+        response.__exit__.return_value = False
         opener = Mock(return_value=response)
         runtime = LocalOpenAICompatibleRuntime(RuntimeConfig(), opener=opener)
         with self.assertRaisesRegex(LocalRuntimeError, "invalid JSON"):

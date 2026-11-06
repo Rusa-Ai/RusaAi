@@ -1,0 +1,34 @@
+project: llm-project
+status: planned
+
+training:
+  pretraining:
+    objective: next_token_prediction
+    precision: bf16
+    distributed:
+      enabled: true
+      strategy: fsdp
+  post_training:
+    - supervised_fine_tuning
+    - rlhf_rlaif
+    - reasoning_rl
+    - safety_alignment
+  checkpointing:
+    enabled: true
+    save_interval_steps: 500
+    keep_last_n: 5
+
+optimization:
+  gradient_checkpointing: true
+  mixed_precision: bf16
+  flash_attention: true
+
+safety:
+  alignment_layers:
+    - constitutional_feedback
+    - red_teaming
+    - classifier_filtering
+
+notes:
+  - This is a design scaffold for future training runs.
+  - Concrete dataset hashes, runtime environment, and evaluation metrics are required before verification.

@@ -47,6 +47,26 @@ The worker currently registers model.chat and a2a.plan only. A2A tasks are
 converted into a scoped planning request; the returned plan is not permission
 to execute code or external actions.
 
+
+## Send a signed task from another local process
+
+Put the validated task envelope in a JSON file, then run:
+
+```bash
+export RUSA_A2A_INGRESS_HMAC_SECRET="the-same-random-secret-used-by-the-ingress"
+python llm-project/orchestrator/a2a_sender.py \
+  --endpoint http://127.0.0.1:8766 \
+  --input ./task-envelope.json
+```
+
+The sender validates the envelope locally, signs the exact canonical JSON bytes,
+and posts to the loopback ingress. It refuses remote, HTTPS, credential-bearing,
+or path-bearing endpoints. Keep the HMAC secret in the process environment or a
+local secret manager; do not put it in the envelope, file, or source control.
+
+The resulting worker task is always classified as planning-only. The response
+contains the queue task ID and a duplicate indicator.
+
 ## Signature construction
 
 The signature is lowercase hexadecimal HMAC-SHA256 over:

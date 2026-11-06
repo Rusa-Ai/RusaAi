@@ -14,6 +14,7 @@ import ipaddress
 import json
 import os
 import re
+import sqlite3
 import signal
 import sys
 import time
@@ -312,7 +313,7 @@ def make_handler(
                 return self._json(400, {"error": str(exc)})
             except QueueConflict:
                 return self._json(409, {"error": "task_id_conflict"})
-            except OSError:
+            except (OSError, sqlite3.Error):
                 return self._json(503, {"error": "queue_storage_unavailable"})
 
             return self._json(

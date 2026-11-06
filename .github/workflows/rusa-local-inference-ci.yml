@@ -1,0 +1,32 @@
+name: RUSA-AI Local Inference Runtime CI
+
+on:
+  pull_request:
+    paths:
+      - "llm-project/**"
+      - ".github/workflows/rusa-local-inference-ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "llm-project/**"
+      - ".github/workflows/rusa-local-inference-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  local-runtime-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile runtime source
+        run: python -m py_compile llm-project/serve/local_runtime.py
+      - name: Run local runtime unit tests
+        run: python -m unittest discover -s llm-project/tests -p "test_local_runtime.py" -v

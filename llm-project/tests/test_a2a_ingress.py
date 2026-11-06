@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "orchestrator"))
 
 from local_queue import SQLiteTaskQueue
+from worker import A2APlanningHandler, LocalWorker
 from a2a_ingress import (
     A2AValidationError,
     make_handler,
@@ -199,6 +200,35 @@ class A2AHttpIngressTests(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as error:
             self.post(envelope, timestamp=str(int(time.time()) - 1000))
         self.assertEqual(error.exception.code, 401)
+
+
+    def test_end_to_end_signed_a2a_task_to_worker_plan(self):
+        envelope = sample_envelope()
+        with self.post(envelope) as response:
+            accepted = json.loads(response.read())
+        self.assertEqual(accepted["status"], "accepted")
+
+        class FakeRuntime:
+            config = type("RuntimeConfigStub", (), {"model": "rusa-local-test"})()
+
+            def complete(self, messages, *, model=None, max_tokens=None, temperature=0.2):
+                self.messages = messages
+                return "1. Inspect repository. 2. Implement scoped change. 3. Run tests."
+
+        runtime = FakeRuntime()
+        worker = LocalWorker(
+            self.queue,
+            "a2a-planning-worker",
+            {"a2a.plan": A2APlanningHandler(runtime)},
+            lease_seconds=2,
+            heartbeat_interval_seconds=0.5,
+        )
+        completed = worker.run_once()
+        self.assertEqual(completed.state, "COMPLETED")
+        self.assertEqual(completed.result["status"], "planning_result")
+        self.assertFalse(completed.result["execution_performed"])
+        self.assertEqual(completed.result["task_id"], envelope["task_id"])
+        self.assertIn("acceptance_criteria", runtime.messages[1]["content"])
 
     def test_rejects_oversized_content_length_before_reading_body(self):
         request = urllib.request.Request(

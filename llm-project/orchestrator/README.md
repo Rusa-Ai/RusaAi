@@ -17,7 +17,7 @@ claims through SQLite write transactions.
 
 ## Minimal use
 
-\`\`\`python
+```python
 from local_queue import SQLiteTaskQueue
 
 queue = SQLiteTaskQueue("./var/rusa-tasks.sqlite3")
@@ -31,17 +31,17 @@ if claimed is not None:
     # Execute only a policy-approved task in a separate isolated executor.
     queue.heartbeat(claimed.task_id, "engineering-worker-02", lease_seconds=60)
     queue.complete(claimed.task_id, "engineering-worker-02")
-\`\`\`
+```
 
 Run from the repository root after adding the orchestrator directory to
-\`PYTHONPATH\`, or import it from the local orchestrator package in a future
+`PYTHONPATH`, or import it from the local orchestrator package in a future
 integration layer.
 
 ## Test
 
-\`\`\`bash
+```bash
 python -m unittest discover -s llm-project/tests -p "test_local_queue.py" -v
-\`\`\`
+```
 
 ## Security boundary and limitations
 

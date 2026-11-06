@@ -25,7 +25,7 @@ class SQLiteTaskQueueTests(unittest.TestCase):
 
     def test_enqueue_is_idempotent_for_same_contract(self):
         first = self.queue.enqueue("test.run", {"suite": "unit"}, task_id="same", now=10)
-        second = self.queue.enqueue("test.run", {"suite": "unit"}, task_id="same", now=11)
+        second = self.queue.enqueue(" test.run ", {"suite": "unit"}, task_id=" same ", now=11)
         self.assertEqual(first.task_id, second.task_id)
         self.assertEqual(len(self.queue.events("same")), 1)
 
@@ -144,6 +144,10 @@ class SQLiteTaskQueueTests(unittest.TestCase):
             self.queue.enqueue("", {})
         with self.assertRaises(ValueError):
             self.queue.enqueue("task", {"bad": float("nan")})
+        with self.assertRaises(ValueError):
+            self.queue.enqueue("task", {"large": "x" * (1024 * 1024)})
+        with self.assertRaises(ValueError):
+            self.queue.enqueue("task", {}, task_id="   ")
         with self.assertRaises(ValueError):
             self.queue.enqueue("task", {}, max_attempts=0)
         with self.assertRaises(ValueError):

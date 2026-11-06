@@ -1,5 +1,4 @@
 import sqlite3
-import sqlite3
 import sys
 import tempfile
 import unittest
@@ -90,6 +89,13 @@ class SQLiteTaskQueueTests(unittest.TestCase):
         self.assertEqual(task.state, "COMPLETED")
         self.assertIsNone(task.claimed_by)
         self.assertIsNone(task.lease_expires_at)
+
+    def test_non_retryable_failure_is_terminal_on_first_attempt(self):
+        self.queue.enqueue("task", {}, task_id="no-retry", max_attempts=5, now=10)
+        self.queue.claim("worker-a", now=11)
+        failed = self.queue.fail("no-retry", "worker-a", "handler not allowed", retryable=False, now=12)
+        self.assertEqual(failed.state, "FAILED")
+        self.assertEqual(failed.attempts, 1)
 
     def test_fail_requeues_then_fails_after_attempt_limit(self):
         self.queue.enqueue("task", {}, task_id="retry", max_attempts=2, now=10)

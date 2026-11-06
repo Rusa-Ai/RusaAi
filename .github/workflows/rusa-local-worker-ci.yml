@@ -1,6 +1,13 @@
 name: RUSA-AI Local Worker CI
 
 on:
+  push:
+    branches:
+      - feat/rusa-local-model-worker-v1
+    paths:
+      - "llm-project/orchestrator/**"
+      - "llm-project/tests/test_local_worker.py"
+      - ".github/workflows/rusa-local-worker-ci.yml"
   pull_request:
     paths:
       - "llm-project/orchestrator/**"

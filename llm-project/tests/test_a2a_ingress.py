@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT / "orchestrator"))
 
 from local_queue import SQLiteTaskQueue
 from worker import A2APlanningHandler, LocalWorker
+from a2a_sender import send_task
 from a2a_ingress import (
     A2AValidationError,
     make_handler,
@@ -166,9 +167,8 @@ class A2AHttpIngressTests(unittest.TestCase):
 
     def test_signed_task_is_enqueued_for_planning_only(self):
         envelope = sample_envelope()
-        with self.post(envelope) as response:
-            result = json.loads(response.read())
-            self.assertEqual(response.status, 202)
+        result = send_task(self.endpoint, envelope, self.SECRET)
+        self.assertEqual(result["status"], "accepted")
         self.assertEqual(result["execution_mode"], "planning_only")
         task = self.queue.get(envelope["task_id"])
         self.assertEqual(task.state, "QUEUED")
@@ -246,6 +246,18 @@ class A2AHttpIngressTests(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as error:
             urllib.request.urlopen(request, timeout=5)
         self.assertEqual(error.exception.code, 413)
+
+
+    def test_sender_rejects_non_loopback_endpoint(self):
+        envelope = sample_envelope()
+        with self.assertRaisesRegex(ValueError, "loopback"):
+            send_task("http://192.168.1.20:8766", envelope, self.SECRET)
+
+    def test_sender_rejects_invalid_envelope_before_network_call(self):
+        envelope = sample_envelope()
+        envelope["type"] = "task.cancel"
+        with self.assertRaisesRegex(ValueError, "only task.create"):
+            send_task(self.endpoint, envelope, self.SECRET)
 
     def test_rejects_non_json_media_type(self):
         request = urllib.request.Request(

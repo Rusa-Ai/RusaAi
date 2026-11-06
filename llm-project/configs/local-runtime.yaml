@@ -1,0 +1,7 @@
+# Example local runtime settings. No model is downloaded or selected automatically.
+runtime:
+  base_url: http://127.0.0.1:11434/v1
+  model: null
+  timeout_seconds: 60
+  max_tokens: 512
+  network_policy: loopback_only

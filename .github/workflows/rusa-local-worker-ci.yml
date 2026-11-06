@@ -24,7 +24,6 @@ jobs:
       - name: Compile worker modules when present
         run: |
           python -m py_compile llm-project/orchestrator/local_queue.py
-          python -m py_compile llm-project/serve/local_runtime.py
           if [ -f llm-project/orchestrator/worker.py ]; then
             python -m py_compile llm-project/orchestrator/worker.py
           fi

@@ -1,7 +1,11 @@
 import json
+import sys
 import urllib.error
 import unittest
+from pathlib import Path
 from unittest.mock import Mock
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "serve"))
 
 from local_runtime import (
     LocalOpenAICompatibleRuntime,
@@ -45,9 +49,11 @@ class RuntimeConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "credentials"):
             RuntimeConfig(base_url="http://127.0.0.1:11434/v1?token=x")
 
-    def test_rejects_invalid_limits(self):
-        with self.assertRaisesRegex(ValueError, "timeout_seconds"):
-            RuntimeConfig(timeout_seconds=0)
+    def test_rejects_invalid_and_non_finite_limits(self):
+        for timeout in (0, float("nan"), float("inf")):
+            with self.subTest(timeout=timeout):
+                with self.assertRaisesRegex(ValueError, "timeout_seconds"):
+                    RuntimeConfig(timeout_seconds=timeout)
         with self.assertRaisesRegex(ValueError, "max_tokens"):
             RuntimeConfig(max_tokens=9000)
 
@@ -114,8 +120,13 @@ class LocalRuntimeTests(unittest.TestCase):
         runtime, _ = self.make_runtime({"choices": []})
         with self.assertRaisesRegex(ValueError, "max_tokens"):
             runtime.complete([{"role": "user", "content": "Hello"}], max_tokens=0)
-        with self.assertRaisesRegex(ValueError, "temperature"):
-            runtime.complete([{"role": "user", "content": "Hello"}], temperature=3)
+        for temperature in (3, float("nan"), float("inf")):
+            with self.subTest(temperature=temperature):
+                with self.assertRaisesRegex(ValueError, "temperature"):
+                    runtime.complete(
+                        [{"role": "user", "content": "Hello"}],
+                        temperature=temperature,
+                    )
 
     def test_bad_json_is_reported(self):
         response = Mock()

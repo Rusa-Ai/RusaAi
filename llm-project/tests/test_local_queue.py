@@ -90,6 +90,13 @@ class SQLiteTaskQueueTests(unittest.TestCase):
         self.assertIsNone(task.claimed_by)
         self.assertIsNone(task.lease_expires_at)
 
+    def test_non_retryable_failure_is_terminal_on_first_attempt(self):
+        self.queue.enqueue("task", {}, task_id="no-retry", max_attempts=5, now=10)
+        self.queue.claim("worker-a", now=11)
+        failed = self.queue.fail("no-retry", "worker-a", "handler not allowed", retryable=False, now=12)
+        self.assertEqual(failed.state, "FAILED")
+        self.assertEqual(failed.attempts, 1)
+
     def test_fail_requeues_then_fails_after_attempt_limit(self):
         self.queue.enqueue("task", {}, task_id="retry", max_attempts=2, now=10)
         self.queue.claim("worker-a", now=11)
@@ -178,6 +185,56 @@ class SQLiteTaskQueueTests(unittest.TestCase):
             [event.event_type for event in self.queue.events("immutable-events")],
             ["TASK_ENQUEUED"],
         )
+
+    def test_complete_persists_json_result(self):
+        self.queue.enqueue("task", {}, task_id="result", now=10)
+        self.queue.claim("worker-a", now=11)
+        completed = self.queue.complete("result", "worker-a", result={"answer": 42}, now=12)
+        self.assertEqual(completed.result, {"answer": 42})
+        self.assertEqual(self.queue.get("result").result, {"answer": 42})
+
+    def test_queue_migrates_legacy_database_without_result_column(self):
+        legacy_path = Path(self.temp_dir.name) / "legacy.sqlite3"
+        connection = sqlite3.connect(legacy_path)
+        connection.execute(
+            """
+            CREATE TABLE tasks (
+                task_id TEXT PRIMARY KEY,
+                task_type TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                state TEXT NOT NULL,
+                priority INTEGER NOT NULL,
+                attempts INTEGER NOT NULL,
+                max_attempts INTEGER NOT NULL,
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL,
+                available_at REAL NOT NULL,
+                claimed_by TEXT,
+                lease_expires_at REAL,
+                last_error TEXT
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO tasks VALUES
+            ('legacy', 'task', '{}', 'QUEUED', 0, 0, 3, 10, 10, 10, NULL, NULL, NULL)
+            """
+        )
+        connection.commit()
+        connection.close()
+
+        migrated = SQLiteTaskQueue(legacy_path)
+        self.assertIsNone(migrated.get("legacy").result)
+        check_connection = migrated._connect()
+        try:
+            columns = {
+                row["name"]
+                for row in check_connection.execute("PRAGMA table_info(tasks)").fetchall()
+            }
+        finally:
+            check_connection.close()
+        self.assertIn("result_json", columns)
 
     def test_file_database_survives_queue_reconstruction(self):
         self.queue.enqueue("task", {"value": 42}, task_id="persisted", now=10)

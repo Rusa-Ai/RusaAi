@@ -220,9 +220,14 @@ class SQLiteTaskQueueTests(unittest.TestCase):
 
         migrated = SQLiteTaskQueue(legacy_path)
         self.assertIsNone(migrated.get("legacy").result)
-        columns = {
-            row["name"] for row in migrated._connect().execute("PRAGMA table_info(tasks)")
-        }
+        check_connection = migrated._connect()
+        try:
+            columns = {
+                row["name"]
+                for row in check_connection.execute("PRAGMA table_info(tasks)").fetchall()
+            }
+        finally:
+            check_connection.close()
         self.assertIn("result_json", columns)
 
     def test_file_database_survives_queue_reconstruction(self):

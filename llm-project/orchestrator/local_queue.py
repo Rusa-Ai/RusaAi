@@ -155,6 +155,18 @@ class SQLiteTaskQueue:
 
                 CREATE INDEX IF NOT EXISTS idx_task_events_task
                     ON task_events(task_id, event_id);
+
+                CREATE TRIGGER IF NOT EXISTS task_events_prevent_update
+                BEFORE UPDATE ON task_events
+                BEGIN
+                    SELECT RAISE(ABORT, 'task_events is append-only');
+                END;
+
+                CREATE TRIGGER IF NOT EXISTS task_events_prevent_delete
+                BEFORE DELETE ON task_events
+                BEGIN
+                    SELECT RAISE(ABORT, 'task_events is append-only');
+                END;
                 """
             )
         finally:
@@ -165,13 +177,14 @@ class SQLiteTaskQueue:
         if not isinstance(payload, Mapping):
             raise ValueError("payload must be a mapping")
         try:
-            return json.dumps(
+            serialized = json.dumps(
                 dict(payload), sort_keys=True, separators=(",", ":"), allow_nan=False
             )
         except (TypeError, ValueError) as exc:
             raise ValueError("payload must contain JSON-compatible finite values") from exc
         if len(serialized.encode("utf-8")) > _MAX_PAYLOAD_BYTES:
             raise ValueError("serialized payload must not exceed 1 MiB")
+        return serialized
 
     @staticmethod
     def _task(row: sqlite3.Row | None) -> Task | None:
@@ -226,7 +239,7 @@ class SQLiteTaskQueue:
         if not isinstance(task_type, str) or not task_type.strip():
             raise ValueError("task_type must be a non-empty string")
         normalized_task_type = task_type.strip()
-        if not isinstance(priority, int) or not -_MAX_PRIORITY <= priority <= _MAX_PRIORITY:
+        if not isinstance(priority, int) or not -(2 ** 31) <= priority <= _MAX_PRIORITY:
             raise ValueError("priority must be a signed 32-bit integer")
         if not isinstance(max_attempts, int) or not 1 <= max_attempts <= _MAX_ATTEMPTS:
             raise ValueError(f"max_attempts must be between 1 and {_MAX_ATTEMPTS}")

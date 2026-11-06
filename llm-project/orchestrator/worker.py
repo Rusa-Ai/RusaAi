@@ -172,6 +172,61 @@ class LocalWorker:
                 stop_event.wait(poll_interval_seconds)
 
 
+
+class A2APlanningHandler:
+    """Turns a validated A2A task into a scoped local-model plan only."""
+
+    def __init__(self, runtime: Any):
+        self.runtime = runtime
+
+    def __call__(self, payload: dict[str, Any]) -> dict[str, Any]:
+        envelope = payload.get("envelope")
+        if not isinstance(envelope, dict) or not isinstance(envelope.get("task"), dict):
+            raise ValueError("a2a.plan payload requires a validated task envelope")
+        task = envelope["task"]
+        task_brief = {
+            "task_id": envelope["task_id"],
+            "objective": task["objective"],
+            "context": task.get("context", ""),
+            "acceptance_criteria": task["acceptance_criteria"],
+            "repository": task["repository"],
+            "base_branch": task["base_branch"],
+            "work_branch": task["work_branch"],
+            "allowed_actions": envelope["policy"]["allowed_actions"],
+            "prohibited_actions": envelope["policy"]["prohibited_actions"],
+            "human_approval_required": envelope["policy"]["human_approval_required"],
+        }
+        answer = self.runtime.complete(
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are the RUSA-AI planning worker. Produce a concise, "
+                        "evidence-oriented implementation plan with scope, ordered "
+                        "steps, tests, risks, and required evidence. Planning only: "
+                        "do not claim code was changed or tests were run. Do not "
+                        "authorize execution, merge, deployment, secrets, permissions, "
+                        "or destructive actions. Respect the supplied repository, "
+                        "branch, acceptance criteria, and approval policy."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(task_brief, ensure_ascii=False, indent=2),
+                },
+            ],
+            temperature=0.2,
+            max_tokens=1536,
+        )
+        return {
+            "task_id": envelope["task_id"],
+            "message_id": envelope["message_id"],
+            "status": "planning_result",
+            "plan": answer,
+            "execution_performed": False,
+        }
+
+
 def build_worker_from_env() -> LocalWorker:
     queue_path = os.getenv("RUSA_QUEUE_DB", "./var/rusa-tasks.sqlite3")
     worker_id = os.getenv("RUSA_WORKER_ID", "rusa-local-worker-01")
@@ -183,7 +238,10 @@ def build_worker_from_env() -> LocalWorker:
     return LocalWorker(
         queue,
         worker_id,
-        {"model.chat": LocalModelChatHandler(runtime)},
+        {
+            "model.chat": LocalModelChatHandler(runtime),
+            "a2a.plan": A2APlanningHandler(runtime),
+        },
         lease_seconds=lease_seconds,
     )
 

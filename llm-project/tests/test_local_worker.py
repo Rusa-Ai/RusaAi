@@ -10,7 +10,7 @@ sys.path.insert(0, str(ROOT / "orchestrator"))
 sys.path.insert(0, str(ROOT / "serve"))
 
 from local_queue import SQLiteTaskQueue
-from worker import LocalModelChatHandler, LocalWorker
+from worker import A2APlanningHandler, LocalModelChatHandler, LocalWorker
 
 
 class FakeRuntime:
@@ -137,6 +137,41 @@ class LocalWorkerTests(unittest.TestCase):
         failed = worker.run_once()
         self.assertEqual(failed.state, "FAILED")
         self.assertEqual(failed.last_error, "InvalidHandlerResult:ValueError")
+
+
+    def test_a2a_planning_handler_returns_plan_without_execution(self):
+        runtime = FakeRuntime("Step 1: inspect. Step 2: implement. Step 3: test.")
+        handler = A2APlanningHandler(runtime)
+        task_payload = {
+            "envelope": {
+                "task_id": "task-uuid",
+                "message_id": "message-uuid",
+                "task": {
+                    "objective": "Add feature safely",
+                    "context": "Local-only system",
+                    "acceptance_criteria": ["Tests pass", "No main write"],
+                    "repository": "Rusa-Ai/RusaAi",
+                    "base_branch": "main",
+                    "work_branch": "feature/safe-plan",
+                },
+                "policy": {
+                    "allowed_actions": ["analyze", "plan"],
+                    "prohibited_actions": ["merge", "deploy"],
+                    "human_approval_required": ["merge", "deploy"],
+                },
+            }
+        }
+        result = handler(task_payload)
+        self.assertEqual(result["status"], "planning_result")
+        self.assertEqual(result["plan"], "Step 1: inspect. Step 2: implement. Step 3: test.")
+        self.assertFalse(result["execution_performed"])
+        self.assertEqual(runtime.calls[0]["temperature"], 0.2)
+        self.assertIn("acceptance_criteria", runtime.calls[0]["messages"][1]["content"])
+
+    def test_a2a_planning_handler_rejects_unstructured_payload(self):
+        handler = A2APlanningHandler(FakeRuntime())
+        with self.assertRaisesRegex(ValueError, "validated task envelope"):
+            handler({"objective": "not an envelope"})
 
     def test_worker_rejects_invalid_lease_configuration(self):
         with self.assertRaises(ValueError):

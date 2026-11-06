@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List
 
 
 @dataclass
@@ -8,10 +8,18 @@ class MoESpec:
     num_experts: int = 64
     experts_per_token: int = 2
 
+    def validate(self) -> None:
+        if self.num_experts <= 0:
+            raise ValueError("num_experts must be positive")
+        if self.experts_per_token <= 0:
+            raise ValueError("experts_per_token must be positive")
+        if self.enabled and self.experts_per_token > self.num_experts:
+            raise ValueError("experts_per_token cannot exceed num_experts")
+
 
 @dataclass
 class ModelSpec:
-    name: str = "opus-5.5-blueprint"
+    name: str = "rusa-ai-base-blueprint"
     model_type: str = "decoder-only-transformer"
     layers: int = 96
     hidden_size: int = 12288
@@ -25,14 +33,27 @@ class ModelSpec:
     moe: MoESpec = field(default_factory=MoESpec)
 
     def validate(self) -> None:
+        if not self.name.strip():
+            raise ValueError("model name must not be empty")
         if self.layers <= 0:
             raise ValueError("layers must be positive")
         if self.hidden_size <= 0:
             raise ValueError("hidden_size must be positive")
+        if self.attention_heads <= 0:
+            raise ValueError("attention_heads must be positive")
+        if self.kv_heads <= 0:
+            raise ValueError("kv_heads must be positive")
+        if self.hidden_size % self.attention_heads != 0:
+            raise ValueError("hidden_size must be divisible by attention_heads")
+        if self.attention_heads % self.kv_heads != 0:
+            raise ValueError("attention_heads must be divisible by kv_heads")
         if self.context_window <= 0:
             raise ValueError("context_window must be positive")
-        if self.moe.enabled and self.moe.num_experts <= 0:
-            raise ValueError("MoE expert count must be positive when enabled")
+        if not self.modalities or any(not item.strip() for item in self.modalities):
+            raise ValueError("modalities must contain non-empty values")
+        if len(set(self.modalities)) != len(self.modalities):
+            raise ValueError("modalities must not contain duplicates")
+        self.moe.validate()
 
 
 @dataclass

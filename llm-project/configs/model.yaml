@@ -2,7 +2,7 @@ project_name: llm-project
 status: planned
 
 model:
-  name: opus-5.5-blueprint
+  name: rusa-ai-base-blueprint
   type: decoder-only-transformer
   architecture:
     layers: 96

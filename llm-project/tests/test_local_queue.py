@@ -1,3 +1,4 @@
+import sqlite3
 import sys
 import tempfile
 import unittest
@@ -156,6 +157,27 @@ class SQLiteTaskQueueTests(unittest.TestCase):
             self.queue.claim("worker", lease_seconds=float("inf"))
         with self.assertRaises(ValueError):
             self.queue.fail("not-found", "worker", "")
+
+    def test_event_log_rejects_updates_and_deletes(self):
+        self.queue.enqueue("task", {}, task_id="immutable-events", now=10)
+        connection = self.queue._connect()
+        try:
+            with self.assertRaises(sqlite3.IntegrityError):
+                connection.execute(
+                    "UPDATE task_events SET event_type = 'TAMPERED' WHERE task_id = ?",
+                    ("immutable-events",),
+                )
+            with self.assertRaises(sqlite3.IntegrityError):
+                connection.execute(
+                    "DELETE FROM task_events WHERE task_id = ?",
+                    ("immutable-events",),
+                )
+        finally:
+            connection.close()
+        self.assertEqual(
+            [event.event_type for event in self.queue.events("immutable-events")],
+            ["TASK_ENQUEUED"],
+        )
 
     def test_file_database_survives_queue_reconstruction(self):
         self.queue.enqueue("task", {"value": 42}, task_id="persisted", now=10)

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import ipaddress
+import math
 import json
 import os
 import sys
@@ -58,8 +59,8 @@ class RuntimeConfig:
                 is_loopback = False
         if not is_loopback:
             raise ValueError("base_url host must be localhost or a loopback IP address")
-        if self.timeout_seconds <= 0:
-            raise ValueError("timeout_seconds must be positive")
+        if not math.isfinite(self.timeout_seconds) or self.timeout_seconds <= 0:
+            raise ValueError("timeout_seconds must be a finite positive number")
         if not 1 <= self.max_tokens <= _MAX_TOKENS:
             raise ValueError(f"max_tokens must be between 1 and {_MAX_TOKENS}")
         if self.model is not None and not self.model.strip():
@@ -169,8 +170,8 @@ class LocalOpenAICompatibleRuntime:
         token_limit = self.config.max_tokens if max_tokens is None else max_tokens
         if not 1 <= token_limit <= _MAX_TOKENS:
             raise ValueError(f"max_tokens must be between 1 and {_MAX_TOKENS}")
-        if not 0 <= temperature <= 2:
-            raise ValueError("temperature must be between 0 and 2")
+        if not math.isfinite(temperature) or not 0 <= temperature <= 2:
+            raise ValueError("temperature must be finite and between 0 and 2")
 
         payload = self._request(
             "chat/completions",

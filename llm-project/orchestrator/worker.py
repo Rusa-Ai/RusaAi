@@ -129,6 +129,7 @@ class LocalWorker:
                 task.task_id,
                 self.worker_id,
                 f"NoHandlerRegistered:{task.task_type[:120]}",
+                retryable=False,
             )
 
         stop_event, heartbeat_thread, heartbeat_failures = self._start_heartbeat(task)

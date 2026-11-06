@@ -48,6 +48,7 @@ class Task:
     claimed_by: str | None
     lease_expires_at: float | None
     last_error: str | None
+    result: Any | None
 
 
 @dataclass(frozen=True)
@@ -134,6 +135,7 @@ class SQLiteTaskQueue:
                     claimed_by TEXT,
                     lease_expires_at REAL,
                     last_error TEXT,
+                    result_json TEXT,
                     CHECK (
                         (state = 'RUNNING' AND claimed_by IS NOT NULL AND lease_expires_at IS NOT NULL)
                         OR
@@ -169,6 +171,11 @@ class SQLiteTaskQueue:
                 END;
                 """
             )
+            columns = {
+                row["name"] for row in connection.execute("PRAGMA table_info(tasks)").fetchall()
+            }
+            if "result_json" not in columns:
+                connection.execute("ALTER TABLE tasks ADD COLUMN result_json TEXT")
         finally:
             connection.close()
 
@@ -184,6 +191,18 @@ class SQLiteTaskQueue:
             raise ValueError("payload must contain JSON-compatible finite values") from exc
         if len(serialized.encode("utf-8")) > _MAX_PAYLOAD_BYTES:
             raise ValueError("serialized payload must not exceed 1 MiB")
+        return serialized
+
+    @staticmethod
+    def _serialize_result(result: Any | None) -> str | None:
+        if result is None:
+            return None
+        try:
+            serialized = json.dumps(result, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("result must contain JSON-compatible finite values") from exc
+        if len(serialized.encode("utf-8")) > _MAX_PAYLOAD_BYTES:
+            raise ValueError("serialized result must not exceed 1 MiB")
         return serialized
 
     @staticmethod
@@ -204,6 +223,7 @@ class SQLiteTaskQueue:
             claimed_by=row["claimed_by"],
             lease_expires_at=row["lease_expires_at"],
             last_error=row["last_error"],
+            result=json.loads(row["result_json"]) if row["result_json"] is not None else None,
         )
 
     @staticmethod
@@ -409,18 +429,26 @@ class SQLiteTaskQueue:
                 connection.execute("SELECT * FROM tasks WHERE task_id = ?", (task_id,)).fetchone()
             )  # type: ignore[return-value]
 
-    def complete(self, task_id: str, worker_id: str, *, now: float | None = None) -> Task:
+    def complete(
+        self,
+        task_id: str,
+        worker_id: str,
+        *,
+        result: Any | None = None,
+        now: float | None = None,
+    ) -> Task:
         timestamp = _timestamp(now)
+        result_json = self._serialize_result(result)
         with self._transaction() as connection:
             self._owned_running_task(connection, task_id, worker_id, timestamp)
             connection.execute(
                 """
                 UPDATE tasks
                 SET state = 'COMPLETED', updated_at = ?, claimed_by = NULL,
-                    lease_expires_at = NULL, last_error = NULL
+                    lease_expires_at = NULL, last_error = NULL, result_json = ?
                 WHERE task_id = ?
                 """,
-                (timestamp, task_id),
+                (timestamp, result_json, task_id),
             )
             self._event(connection, task_id, "TASK_COMPLETED", worker_id, timestamp)
             return self._task(

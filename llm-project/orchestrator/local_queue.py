@@ -315,7 +315,7 @@ class SQLiteTaskQueue:
         ).fetchall()
         reclaimed: list[str] = []
         for row in expired:
-            retry = row["attempts"] < row["max_attempts"]
+            retry = retryable and row["attempts"] < row["max_attempts"]
             new_state = "QUEUED" if retry else "FAILED"
             event_type = "LEASE_EXPIRED_REQUEUED" if retry else "LEASE_EXPIRED_FAILED"
             connection.execute(
@@ -462,6 +462,7 @@ class SQLiteTaskQueue:
         error: str,
         *,
         retry_delay_seconds: float = 0.0,
+        retryable: bool = True,
         now: float | None = None,
     ) -> Task:
         if not isinstance(error, str) or not error.strip():

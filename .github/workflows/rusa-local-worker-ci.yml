@@ -1,0 +1,32 @@
+name: RUSA-AI Local Worker CI
+
+on:
+  pull_request:
+    paths:
+      - "llm-project/orchestrator/**"
+      - "llm-project/tests/test_local_worker.py"
+      - ".github/workflows/rusa-local-worker-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  local-worker-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile worker modules
+        run: |
+          python -m py_compile llm-project/orchestrator/local_queue.py
+          python -m py_compile llm-project/orchestrator/worker.py
+          python -m py_compile llm-project/serve/local_runtime.py
+      - name: Run local queue and worker tests
+        run: |
+          python -m unittest discover -s llm-project/tests -p "test_local_queue.py" -v
+          python -m unittest discover -s llm-project/tests -p "test_local_worker.py" -v

@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import math
 import sqlite3
+import time
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -20,6 +21,8 @@ _STATES = ("QUEUED", "RUNNING", "COMPLETED", "FAILED", "CANCELLED")
 _TERMINAL_STATES = {"COMPLETED", "FAILED", "CANCELLED"}
 _MAX_ATTEMPTS = 100
 _MAX_ERROR_LENGTH = 2000
+_MAX_PAYLOAD_BYTES = 1024 * 1024
+_MAX_PRIORITY = (2 ** 31) - 1
 
 
 class QueueError(RuntimeError):
@@ -58,7 +61,7 @@ class TaskEvent:
 
 
 def _timestamp(value: float | None) -> float:
-    result = __import__("time").time() if value is None else float(value)
+    result = time.time() if value is None else float(value)
     if not math.isfinite(result):
         raise ValueError("timestamp must be finite")
     return result
@@ -78,11 +81,12 @@ class SQLiteTaskQueue:
         path = str(database_path)
         if not path or path == ":memory:":
             raise ValueError("use a file-backed SQLite database for durable queue state")
-        self.database_path = path
+        expanded_path = Path(path).expanduser()
+        expanded_path.parent.resolve().mkdir(parents=True, exist_ok=True)
+        self.database_path = str(expanded_path)
         self.busy_timeout_seconds = _positive_duration(
             busy_timeout_seconds, "busy_timeout_seconds"
         )
-        Path(path).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
@@ -166,6 +170,8 @@ class SQLiteTaskQueue:
             )
         except (TypeError, ValueError) as exc:
             raise ValueError("payload must contain JSON-compatible finite values") from exc
+        if len(serialized.encode("utf-8")) > _MAX_PAYLOAD_BYTES:
+            raise ValueError("serialized payload must not exceed 1 MiB")
 
     @staticmethod
     def _task(row: sqlite3.Row | None) -> Task | None:
@@ -219,14 +225,15 @@ class SQLiteTaskQueue:
     ) -> Task:
         if not isinstance(task_type, str) or not task_type.strip():
             raise ValueError("task_type must be a non-empty string")
-        if not isinstance(priority, int):
-            raise ValueError("priority must be an integer")
+        normalized_task_type = task_type.strip()
+        if not isinstance(priority, int) or not -_MAX_PRIORITY <= priority <= _MAX_PRIORITY:
+            raise ValueError("priority must be a signed 32-bit integer")
         if not isinstance(max_attempts, int) or not 1 <= max_attempts <= _MAX_ATTEMPTS:
             raise ValueError(f"max_attempts must be between 1 and {_MAX_ATTEMPTS}")
         timestamp = _timestamp(now)
         serialized = self._serialize_payload(payload)
-        identifier = task_id or str(uuid.uuid4())
-        if not isinstance(identifier, str) or not identifier.strip():
+        identifier = (task_id or str(uuid.uuid4())).strip()
+        if not identifier:
             raise ValueError("task_id must be a non-empty string")
 
         with self._transaction() as connection:
@@ -235,7 +242,7 @@ class SQLiteTaskQueue:
             ).fetchone()
             if existing is not None:
                 same_request = (
-                    existing["task_type"] == task_type
+                    existing["task_type"] == normalized_task_type
                     and existing["payload_json"] == serialized
                     and existing["priority"] == priority
                     and existing["max_attempts"] == max_attempts
@@ -251,7 +258,7 @@ class SQLiteTaskQueue:
                     max_attempts, created_at, updated_at, available_at
                 ) VALUES (?, ?, ?, 'QUEUED', ?, 0, ?, ?, ?, ?)
                 """,
-                (identifier, task_type.strip(), serialized, priority, max_attempts,
+                (identifier, normalized_task_type, serialized, priority, max_attempts,
                  timestamp, timestamp, timestamp),
             )
             self._event(
@@ -310,6 +317,7 @@ class SQLiteTaskQueue:
             raise ValueError("worker_id must be a non-empty string")
         if len(worker_id) > 128:
             raise ValueError("worker_id must be at most 128 characters")
+        worker_id = worker_id.strip()
         lease = _positive_duration(lease_seconds, "lease_seconds")
         timestamp = _timestamp(now)
 

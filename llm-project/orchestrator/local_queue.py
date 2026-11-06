@@ -232,9 +232,10 @@ class SQLiteTaskQueue:
             raise ValueError(f"max_attempts must be between 1 and {_MAX_ATTEMPTS}")
         timestamp = _timestamp(now)
         serialized = self._serialize_payload(payload)
-        identifier = (task_id or str(uuid.uuid4())).strip()
-        if not identifier:
+        identifier = str(uuid.uuid4()) if task_id is None else task_id
+        if not isinstance(identifier, str) or not identifier.strip():
             raise ValueError("task_id must be a non-empty string")
+        identifier = identifier.strip()
 
         with self._transaction() as connection:
             existing = connection.execute(

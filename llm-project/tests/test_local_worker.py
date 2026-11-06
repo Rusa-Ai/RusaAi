@@ -64,7 +64,7 @@ class LocalWorkerTests(unittest.TestCase):
         self.assertIsNone(worker.run_once())
 
     def test_unregistered_task_type_fails_without_execution(self):
-        self.queue.enqueue("shell.exec", {"command": "not allowed"}, task_id="unhandled", max_attempts=1)
+        self.queue.enqueue("shell.exec", {"command": "not allowed"}, task_id="unhandled")
         worker = LocalWorker(self.queue, "worker-no-handler", {}, lease_seconds=2)
         failed = worker.run_once()
         self.assertEqual(failed.state, "FAILED")

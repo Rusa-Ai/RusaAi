@@ -80,6 +80,7 @@ class A2AEnvelopeTests(unittest.TestCase):
     def test_rejects_unsafe_or_invalid_task_contract(self):
         for mutate in (
             lambda p: p["task"].update(repository="../outside"),
+            lambda p: p["task"].update(repository="owner/.."),
             lambda p: p["task"].update(work_branch="feature/../main"),
             lambda p: p["task"].update(acceptance_criteria=[]),
             lambda p: p["task"].update(objective=""),
